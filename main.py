@@ -2,6 +2,7 @@ import sys
 from typing import List
 
 import pygame
+import card_options
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -34,6 +35,17 @@ class Player(object):
         self.name = name
         self.team = team
         self.pawns = []
+        self.cards = []
+
+    def draw_card(self, deck):
+        card_drawn = deck.pop()
+        self.cards.append(card_drawn)
+        return card_drawn
+
+    # def play_card(self, card, pawn):
+    #     self.cards.remove(card)
+    #     card_action = card['action']
+    #     if card_action is 'start':
 
 
 class Point(object):
@@ -77,6 +89,17 @@ class StartPoint(Point):
         self.team = team
         self.color = team.color
 
+    def get_exit_point(self):
+
+        if self.x == Board.BOARD_START_X + Board.START_LENGTH:
+            return self.x - Board.START_LENGTH, self.y
+        elif self.x == Board.BOARD_START_X + Board.START_OFFSET:
+            return self.x, self.y - Board.START_LENGTH
+        elif self.x == Board.BOARD_LENGTH - Board.START_LENGTH:
+            return self.x + Board.START_LENGTH, self.y
+        else:
+            return self.x, self.y - Board.START_LENGTH
+
 
 class Pawn(object):
     PAWN_SIZE = 5
@@ -85,6 +108,31 @@ class Pawn(object):
     def __init__(self, player: Player, point: Point):
         self.player = player
         self.point = point
+
+    def move_pawn(self, new_point):
+        if not new_point.is_occupied:
+            self.point = new_point
+
+
+class Card(object):
+    ALL_CARD_OPTIONS = card_options.CARD_OPTIONS
+
+    def __init__(self, card_text: str, card_id: int):
+        self.card_text = card_text
+        self.card_id = card_id
+
+    def handle_card_effect(self):
+        if self.card_id == 1:
+            return {
+                'action': 'start',
+                'value': 1
+            }
+
+
+class Deck(object):
+
+    def __init__(self, cards: List[Card]):
+        self.cards = cards
 
 
 class Board(object):
@@ -101,14 +149,16 @@ class Board(object):
 
     def __init__(self, players):
 
-        self.points: List[Point] = []
+        self.standard_points: List[StandardPoint] = []
+        self.safe_points: List[SafePoint] = []
         self.start_points: List[StartPoint] = []
+        self.runway_points: List[RunwayPoint] = []
 
         for i in range(0, self.BOARD_LENGTH + 1):
-            self.points.append(StandardPoint(x=i, y=self.BOARD_START_Y))
-            self.points.append(StandardPoint(x=i, y=self.BOARD_LENGTH))
-            self.points.append(StandardPoint(x=self.BOARD_WIDTH, y=i))
-            self.points.append(StandardPoint(x=self.BOARD_START_X, y=i))
+            self.standard_points.append(StandardPoint(x=i, y=self.BOARD_START_Y))
+            self.standard_points.append(StandardPoint(x=i, y=self.BOARD_LENGTH))
+            self.standard_points.append(StandardPoint(x=self.BOARD_WIDTH, y=i))
+            self.standard_points.append(StandardPoint(x=self.BOARD_START_X, y=i))
 
         start_coords = ((self.BOARD_START_X + self.START_OFFSET, self.BOARD_START_Y + self.START_LENGTH),
                         (self.BOARD_LENGTH - self.START_LENGTH, self.BOARD_START_Y + self.START_OFFSET),
@@ -133,13 +183,31 @@ class Board(object):
             start_point = StartPoint(x=start_coords[index][0], y=start_coords[index][1], team=player.team)
             safe_point = SafePoint(x=safe_coords[index][0], y=safe_coords[index][1], team=player.team)
             player.team.start_point = start_point
+            print(start_point.x, start_point.y, start_point.get_exit_point())
             player.team.safe_point = safe_point
-            self.points.append(start_point)
-            self.points.append(safe_point)
+            self.start_points.append(start_point)
+            self.safe_points.append(safe_point)
             for runway_coord in runway_coords[index]:
                 runway_point = RunwayPoint(x=runway_coord[0], y=runway_coord[1], team=player.team)
                 player.team.runway_points.append(runway_point)
-                self.points.append(runway_point)
+                self.runway_points.append(runway_point)
+
+    def draw_point(self, point, screen):
+        new_rect = pygame.rect = (
+            point.x * self.POINT_SIZE, point.y * self.POINT_SIZE, self.POINT_SIZE,
+            self.POINT_SIZE)
+        pygame.draw.rect(screen, point.color, new_rect, 1)
+
+    def draw_board(self, screen):
+
+        for standard_point in self.standard_points:
+            self.draw_point(standard_point, screen)
+        for start_point in self.start_points:
+            self.draw_point(start_point, screen)
+        for safe_point in self.safe_points:
+            self.draw_point(safe_point, screen)
+        for runway_point in self.runway_points:
+            self.draw_point(runway_point, screen)
 
 
 class Game(object):
@@ -149,16 +217,11 @@ class Game(object):
         self.players: List[Player] = []
         self.create_players()
         self.board = Board(self.players)
+        self.deck: Deck
         self.create_pawns()
         self.screen = pygame.display.set_mode([480, 480])
         self.screen.fill(WHITE)
-
-    def draw_board(self):
-        for point in self.board.points:
-            new_rect = pygame.rect = (
-                point.x * self.board.POINT_SIZE, point.y * self.board.POINT_SIZE, self.board.POINT_SIZE,
-                self.board.POINT_SIZE)
-            pygame.draw.rect(self.screen, point.color, new_rect, 1)
+        self.board.draw_board(self.screen)
 
         for player in self.players:
             pawn_offset = Pawn.PAWN_OFFSET
@@ -167,7 +230,7 @@ class Game(object):
                     pawn.point.x * self.board.POINT_SIZE + pawn_offset, pawn.point.y * self.board.POINT_SIZE +
                     pawn_offset, Pawn.PAWN_SIZE, Pawn.PAWN_SIZE
                 )
-                pygame.draw.rect(self.screen, player.team.color, new_rect, 1)
+                pygame.draw.rect(selfdw.screen, player.team.color, new_rect, 1)
                 pawn_offset += 5
 
     def create_players(self):
@@ -185,7 +248,6 @@ class Game(object):
 
 
 game = Game()
-game.draw_board()
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
