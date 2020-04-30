@@ -2,7 +2,7 @@ import sys
 from typing import List
 
 import pygame
-import card_options
+import card_types
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -28,6 +28,16 @@ class Team(object):
         self.safe_point = None
         self.runway_points = []
 
+    def get_exit_point(self):
+        if self.start_point.x == Board.BOARD_START_X + Board.START_LENGTH:
+            return self.start_point.x - Board.START_LENGTH, self.start_point.y
+        elif self.start_point.x == Board.BOARD_START_X + Board.START_OFFSET:
+            return self.start_point.x, self.start_point.y - Board.START_LENGTH
+        elif self.start_point.x == Board.BOARD_LENGTH - Board.START_LENGTH:
+            return self.start_point.x + Board.START_LENGTH, self.start_point.y
+        else:
+            return self.start_point.x, self.start_point.y - Board.START_LENGTH
+
 
 class Player(object):
 
@@ -42,10 +52,20 @@ class Player(object):
         self.cards.append(card_drawn)
         return card_drawn
 
-    # def play_card(self, card, pawn):
-    #     self.cards.remove(card)
-    #     card_action = card['action']
-    #     if card_action is 'start':
+    def play_card(self, card, pawn):
+        self.cards.remove(card)
+        card_options = card['options']
+        choice = card_options[0]
+        value = card['value']
+        if choice == "start":
+            # Only start movement cards are 1 and 2
+            exit_point = self.team.get_exit_point()
+            if value == 1:
+                pawn.move_pawn(exit_point)
+            else:
+                pawn.move_pawn(Board.find_pos(curr_pos=exit_point, value=1))
+        elif choice == "move":
+            pawn.move_pawn(Board.find_pos(curr_pos=pawn.point, value=value))
 
 
 class Point(object):
@@ -89,17 +109,6 @@ class StartPoint(Point):
         self.team = team
         self.color = team.color
 
-    def get_exit_point(self):
-
-        if self.x == Board.BOARD_START_X + Board.START_LENGTH:
-            return self.x - Board.START_LENGTH, self.y
-        elif self.x == Board.BOARD_START_X + Board.START_OFFSET:
-            return self.x, self.y - Board.START_LENGTH
-        elif self.x == Board.BOARD_LENGTH - Board.START_LENGTH:
-            return self.x + Board.START_LENGTH, self.y
-        else:
-            return self.x, self.y - Board.START_LENGTH
-
 
 class Pawn(object):
     PAWN_SIZE = 5
@@ -115,7 +124,7 @@ class Pawn(object):
 
 
 class Card(object):
-    ALL_CARD_OPTIONS = card_options.CARD_OPTIONS
+    ALL_CARD_TYPES = card_types.CARD_TYPES
 
     def __init__(self, card_text: str, card_id: int):
         self.card_text = card_text
@@ -124,7 +133,7 @@ class Card(object):
     def handle_card_effect(self):
         if self.card_id == 1:
             return {
-                'action': 'start',
+                'options': ['start', 'move'],
                 'value': 1
             }
 
@@ -183,7 +192,6 @@ class Board(object):
             start_point = StartPoint(x=start_coords[index][0], y=start_coords[index][1], team=player.team)
             safe_point = SafePoint(x=safe_coords[index][0], y=safe_coords[index][1], team=player.team)
             player.team.start_point = start_point
-            print(start_point.x, start_point.y, start_point.get_exit_point())
             player.team.safe_point = safe_point
             self.start_points.append(start_point)
             self.safe_points.append(safe_point)
@@ -209,6 +217,44 @@ class Board(object):
         for runway_point in self.runway_points:
             self.draw_point(runway_point, screen)
 
+    # TODO: Change return value to be a Point, not coordsd
+    @staticmethod
+    def find_pos(curr_pos, value):
+        x, y = curr_pos
+        # Top lanew
+        if y == Board.BOARD_START_Y and x <= Board.BOARD_WIDTH:
+            if value + x > Board.BOARD_WIDTH:
+                new_x = Board.BOARD_WIDTH
+                new_y = Board.BOARD_START_Y + value - x
+            else:
+                new_x = value + x
+                new_y = y
+        # Right lane
+        elif x == Board.BOARD_WIDTH and y <= Board.BOARD_LENGTH:
+            if value + y > Board.BOARD_LENGTH:
+                new_x = Board.BOARD_WIDTH - value - x
+                new_y = Board.BOARD_LENGTH
+            else:
+                new_x = value + x
+                new_y = y
+        # Bottom lane
+        elif y == Board.BOARD_LENGTH and x >= Board.BOARD_START_X:
+            if x - value < Board.BOARD_START_X:
+                new_x = Board.BOARD_START_X
+                new_y = Board.BOARD_LENGTH - value - x
+            else:
+                new_x = x - value
+                new_y = y
+        # Left lane
+        else:
+            if y - value < Board.BOARD_START_Y:
+                new_x = y - value
+                new_y = Board.BOARD_START_Y
+            else:
+                new_x = x
+                new_y = y - value
+        return new_x, new_y
+
 
 class Game(object):
 
@@ -230,7 +276,7 @@ class Game(object):
                     pawn.point.x * self.board.POINT_SIZE + pawn_offset, pawn.point.y * self.board.POINT_SIZE +
                     pawn_offset, Pawn.PAWN_SIZE, Pawn.PAWN_SIZE
                 )
-                pygame.draw.rect(selfdw.screen, player.team.color, new_rect, 1)
+                pygame.draw.rect(self.screen, player.team.color, new_rect, 1)
                 pawn_offset += 5
 
     def create_players(self):

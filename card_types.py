@@ -1,4 +1,4 @@
-CARD_OPTIONS = (
+CARD_TYPES = (
 {"card_id": 1, "card_text": "Either move a pawn from Start or move a pawn one space forward."},
 {"card_id": 1, "card_text": "Either move a pawn from Start or move a pawn two spaces forward. Drawing a two entitles the player to draw again at the end of their turn. If the player cannot use a two to move, he or she can still draw again."},
 {"card_id": 1, "card_text": "Move a pawn three spaces forward."},
