@@ -1,5 +1,6 @@
 import sys
-from typing import List
+from time import sleep
+from typing import List, Dict
 
 import pygame
 import card_types
@@ -47,25 +48,29 @@ class Player(object):
         self.pawns = []
         self.cards = []
 
-    def draw_card(self, deck):
-        card_drawn = deck.pop()
-        self.cards.append(card_drawn)
-        return card_drawn
+    def draw_card(self, card):
+        self.cards.append(card)
 
-    def play_card(self, card, pawn):
+    def play_card(self, card, curr_point):
         self.cards.remove(card)
-        card_options = card['options']
-        choice = card_options[0]
-        value = card['value']
+        choice = card.card_effect['options'][0]
+        value = card.card_effect['value']
+        new_pos = (0, 0)
+
         if choice == "start":
             # Only start movement cards are 1 and 2
             exit_point = self.team.get_exit_point()
+            pawn = self.team.start_point.occupied_by.pop()
+            print(self.team.start_point.occupied_by)
             if value == 1:
-                pawn.move_pawn(exit_point)
+                new_pos = exit_point
             else:
-                pawn.move_pawn(Board.find_pos(curr_pos=exit_point, value=1))
-        elif choice == "move":
-            pawn.move_pawn(Board.find_pos(curr_pos=pawn.point, value=value))
+                new_pos = Board.find_new_pos(curr_pos=exit_point, value=1)
+
+
+        # elif choice == "move":
+        #     pawn.move_pawn(Board.find_new_pos(curr_pos=pawn.point, value=value))
+        return pawn, new_pos
 
 
 class Point(object):
@@ -81,7 +86,7 @@ class StandardPoint(Point):
 
     def __init__(self, x: int, y: int):
         super().__init__(x, y)
-        self.occupied_by = None
+        self.occupied_by = []
 
 
 class RunwayPoint(Point):
@@ -90,7 +95,7 @@ class RunwayPoint(Point):
         super().__init__(x, y)
         self.team = team
         self.color = team.color
-        self.occupied_by = None
+        self.occupied_by = []
 
 
 class SafePoint(Point):
@@ -99,7 +104,7 @@ class SafePoint(Point):
         super().__init__(x, y)
         self.team = team
         self.color = team.color
-        self.num_pieces: int = 0
+        self.occupied_by = []
 
 
 class StartPoint(Point):
@@ -108,40 +113,40 @@ class StartPoint(Point):
         super().__init__(x, y)
         self.team = team
         self.color = team.color
+        self.occupied_by = []
 
 
 class Pawn(object):
     PAWN_SIZE = 5
     PAWN_OFFSET = 5
 
-    def __init__(self, player: Player, point: Point):
+    def __init__(self, player: Player):
         self.player = player
-        self.point = point
-
-    def move_pawn(self, new_point):
-        if not new_point.is_occupied:
-            self.point = new_point
 
 
 class Card(object):
     ALL_CARD_TYPES = card_types.CARD_TYPES
 
-    def __init__(self, card_text: str, card_id: int):
+    def __init__(self, card_text: str, card_id: int, card_effect: Dict):
         self.card_text = card_text
         self.card_id = card_id
+        self.card_effect = card_effect
 
-    def handle_card_effect(self):
-        if self.card_id == 1:
-            return {
-                'options': ['start', 'move'],
-                'value': 1
-            }
+    # def handle_card_effect(self):
+    #     if self.card_id == 1:
+    #         return {
+    #             'options': ['start', 'move'],
+    #             'value': 1
+    #         }
 
 
 class Deck(object):
 
     def __init__(self, cards: List[Card]):
         self.cards = cards
+
+    def draw_card(self):
+        return self.cards.pop()
 
 
 class Board(object):
@@ -158,6 +163,7 @@ class Board(object):
 
     def __init__(self, players):
 
+        self.all_points = []
         self.standard_points: List[StandardPoint] = []
         self.safe_points: List[SafePoint] = []
         self.start_points: List[StartPoint] = []
@@ -206,22 +212,59 @@ class Board(object):
             self.POINT_SIZE)
         pygame.draw.rect(screen, point.color, new_rect, 1)
 
-    def draw_board(self, screen):
+    def draw_pawn(self, point, pawn_offset, screen):
+        new_rect = pygame.rect = (
+            point.x * self.POINT_SIZE + pawn_offset, point.y * self.POINT_SIZE +
+            pawn_offset, Pawn.PAWN_SIZE, Pawn.PAWN_SIZE
+        )
+        pygame.draw.rect(screen, point.occupied_by[0].player.team.color, new_rect, 1)
 
+    def move_pice(self, coords, pawn):
+        x, y = coords
+        new_point = self.get_point(x=x, y=y)
+        new_point.occupied_by.append(pawn)
+
+    def draw_board(self, screen):
+        # TODO: Look into clearing only specific areas
+        screen.fill(WHITE)
         for standard_point in self.standard_points:
+            pawn_offset = Pawn.PAWN_OFFSET
+            for _ in standard_point.occupied_by:
+                self.draw_pawn(standard_point, pawn_offset, screen)
             self.draw_point(standard_point, screen)
+            self.all_points.append(standard_point)
         for start_point in self.start_points:
+            print(start_point.occupied_by)
+            pawn_offset = Pawn.PAWN_OFFSET
+            for _ in start_point.occupied_by:
+                self.draw_pawn(start_point, pawn_offset, screen)
+                pawn_offset += 5
             self.draw_point(start_point, screen)
         for safe_point in self.safe_points:
+            pawn_offset = Pawn.PAWN_OFFSET
+            for _ in safe_point.occupied_by:
+                self.draw_pawn(safe_point, pawn_offset, screen)
+                pawn_offset += 5
             self.draw_point(safe_point, screen)
         for runway_point in self.runway_points:
+            pawn_offset = Pawn.PAWN_OFFSET
+            for _ in runway_point.occupied_by:
+                self.draw_pawn(runway_point, pawn_offset, screen)
             self.draw_point(runway_point, screen)
+            self.all_points.append(runway_point)
 
-    # TODO: Change return value to be a Point, not coordsd
+    def get_point(self, x, y):
+        # TODO: Refactor to use more efficient method of finding points
+        for point in self.all_points:
+            if point.x == x and point.y == y:
+                return point
+        return None
+
+    # TODO: Change return value to be a Point, not coords
     @staticmethod
-    def find_pos(curr_pos, value):
+    def find_new_pos(curr_pos, value):
         x, y = curr_pos
-        # Top lanew
+        # Top lane
         if y == Board.BOARD_START_Y and x <= Board.BOARD_WIDTH:
             if value + x > Board.BOARD_WIDTH:
                 new_x = Board.BOARD_WIDTH
@@ -263,21 +306,28 @@ class Game(object):
         self.players: List[Player] = []
         self.create_players()
         self.board = Board(self.players)
-        self.deck: Deck
+        self.deck = self.create_deck()
         self.create_pawns()
         self.screen = pygame.display.set_mode([480, 480])
         self.screen.fill(WHITE)
         self.board.draw_board(self.screen)
 
-        for player in self.players:
-            pawn_offset = Pawn.PAWN_OFFSET
-            for pawn in player.pawns:
-                new_rect = pygame.rect = (
-                    pawn.point.x * self.board.POINT_SIZE + pawn_offset, pawn.point.y * self.board.POINT_SIZE +
-                    pawn_offset, Pawn.PAWN_SIZE, Pawn.PAWN_SIZE
-                )
-                pygame.draw.rect(self.screen, player.team.color, new_rect, 1)
-                pawn_offset += 5
+        # for player in self.players:
+        #     pawn_offset = Pawn.PAWN_OFFSET
+        #     for pawn in player.pawns:
+        #         new_rect = pygame.rect = (
+        #             pawn.point.x * self.board.POINT_SIZE + pawn_offset, pawn.point.y * self.board.POINT_SIZE +
+        #             pawn_offset, Pawn.PAWN_SIZE, Pawn.PAWN_SIZE
+        #         )
+        #         pygame.draw.rect(self.screen, player.team.color, new_rect, 1)
+        #         pawn_offset += 5
+
+    def create_deck(self):
+        # todo: generate all cards
+        card = Card("start", 1, {'options': ['start', 'move'], 'value': 1})
+        cards = [card]
+        deck = Deck(cards)
+        return deck
 
     def create_players(self):
         for color_choice in Team.COLOR_CHOICES:
@@ -289,11 +339,18 @@ class Game(object):
         for player in self.players:
             print(player.team.safe_point)
             for i in range(0, 4):
-                pawn = Pawn(player=player, point=player.team.safe_point)
+                pawn = Pawn(player=player)
+                player.team.start_point.occupied_by.append(pawn)
                 player.pawns.append(pawn)
 
 
+
 game = Game()
+player_one = game.players[0]
+player_one.draw_card(game.deck.draw_card())
+pawn, new_pos = player_one.play_card(player_one.cards[0], curr_point=player_one.team.start_point)
+game.board.move_pice(new_pos, pawn)
+game.board.draw_board(game.screen)
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
