@@ -71,7 +71,7 @@ class Board(object):
                 player.team.runway_points.append(runway_point)
                 self.runway_points.append(runway_point)
 
-    def move_pice(self, coords, pawn):
+    def move_piece(self, coords, pawn):
         x, y = coords
         new_point = self.get_point(x=x, y=y)
         new_point.occupied_by.append(pawn)

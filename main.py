@@ -15,13 +15,13 @@ YELLOW = (255, 255, 0)
 GREY = (220, 220, 220)
 
 game = Game()
+print(game.deck)
 player_one = game.players[0]
 player_one.add_card(game.deck.draw_card())
 card = player_one.cards[0]
 player_one.play_card(card=player_one.cards[0])
 new_pos, pawn = game.handle_card_action(player_one.team.start_point, card)
-print(new_pos)
-game.board.move_pice(new_pos, pawn)
+game.board.move_piece(new_pos, pawn)
 game.draw_board(game.screen)
 while True:
     for event in pygame.event.get():

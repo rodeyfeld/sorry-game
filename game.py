@@ -1,13 +1,13 @@
 from typing import List
-
-import pygame
-
+from card_types import CARD_TYPES
 from board import Board
 from card import Card
 from deck import Deck
 from pawn import Pawn
 from player import Player
 from team import Team
+import pygame
+
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -25,18 +25,20 @@ class Game(object):
         self.players: List[Player] = []
         self.create_players()
         self.board = Board(self.players)
-        self.deck = self.create_deck()
+        self.deck = Deck([])
+        self.create_deck()
         self.create_pawns()
         self.screen = pygame.display.set_mode([480, 480])
         self.screen.fill(WHITE)
         self.draw_board(self.screen)
 
     def create_deck(self):
-        # todo: generate all cards
-        card = Card("start text", 1, {'options': ['start', 'move'], 'value': 1})
-        cards = [card]
-        deck = Deck(cards)
-        return deck
+        for card_type in CARD_TYPES:
+            for _ in range(0, 4):
+                card = Card(card_effect=card_type["card_effect"],
+                            card_text=card_type["card_text"],
+                            card_id=card_type["card_id"])
+                self.deck.cards.append(card)
 
     def create_players(self):
         for color_choice in Team.COLOR_CHOICES:
@@ -92,22 +94,22 @@ class Game(object):
             self.draw_point(runway_point, screen)
             self.board.all_points.append(runway_point)
 
-    def handle_card_action(self, start_point, card):
+    def handle_card_action(self, selected_point, card):
         print(card)
-        choice = card.card_effect['options'][0]
-        value = card.card_effect['value']
+        choice = card.card_effect["options"][0]
+        value = card.card_effect["value"]
         new_pos = (0, 0)
 
         if choice == "start":
             # Only start movement cards are 1 and 2
-            team = start_point.occupied_by[0].player.team
+            team = selected_point.occupied_by[0].player.team
             exit_point = self.board.get_exit_point(team=team)
             pawn = team.start_point.occupied_by.pop()
             if value == 1:
                 new_pos = exit_point
             else:
                 new_pos = Board.find_new_pos(curr_pos=exit_point, value=1)
-
-        # elif choice == "move":
-        #     pawn.move_pawn(Board.find_new_pos(curr_pos=pawn.point, value=value))
+        elif choice == "move":
+            pawn = selected_point.occupied_by[0]
+            new_pos = Board.find_new_pos(curr_pos=selected_point, value=value)
         return new_pos, pawn
